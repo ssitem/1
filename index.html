@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CACHE BUSTING META TAGS -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Digital File Store - Market Dokumen Profesional</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -89,6 +93,10 @@
     </style>
     <!-- EMBEDDED BACKUP STATE STORE -->
     <script id="app-state-store" type="application/json">null</script>
+    <script>
+        // BUILD VERSION TIMESTAMP UNTUK ANTI-CACHE OTOMATIS
+        const APP_BUILD_VERSION = "2026-03-30-v2";
+    </script>
 </head>
 <body class="min-h-screen flex flex-col selection:bg-primary selection:text-white pb-20 sm:pb-0">
 
@@ -744,14 +752,29 @@
             "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=600&q=80"
         ];
 
-        // --- STATE MANAGEMENT ---
+        // --- STATE MANAGEMENT & SMART CACHE BUSTING ---
         let state = {};
 
         function loadState() {
+            const cachedVersion = localStorage.getItem('dm_build_version');
             const injectedEl = document.getElementById('app-state-store');
             let injectedState = null;
+            
             if (injectedEl && injectedEl.innerText.trim() !== 'null') {
                 try { injectedState = JSON.parse(injectedEl.innerText); } catch (e) {}
+            }
+
+            // Jika versi build di GitHub berbeda dengan cache lokal browser, reset cache lokal agar data terbaru dari GitHub langsung dimuat
+            if (cachedVersion !== APP_BUILD_VERSION) {
+                localStorage.removeItem('dm_settings');
+                localStorage.removeItem('dm_products');
+                localStorage.removeItem('dm_testimonials');
+                localStorage.removeItem('dm_faqs');
+                localStorage.removeItem('dm_paymentProofs');
+                localStorage.removeItem('dm_banners');
+                localStorage.removeItem('dm_live_sales');
+                localStorage.removeItem('dm_announcements');
+                localStorage.setItem('dm_build_version', APP_BUILD_VERSION);
             }
 
             const localSettings = JSON.parse(localStorage.getItem('dm_settings'));
@@ -790,6 +813,7 @@
                 localStorage.setItem('dm_banners', JSON.stringify(state.banners));
                 localStorage.setItem('dm_live_sales', JSON.stringify(state.liveSales));
                 localStorage.setItem('dm_announcements', JSON.stringify(state.announcements));
+                localStorage.setItem('dm_build_version', APP_BUILD_VERSION);
             } catch (e) {
                 console.warn("Storage quota exceeded", e);
             }
@@ -809,7 +833,6 @@
         let bannerTimer = null;
         let announcementIndex = 0;
         let announcementTimer = null;
-        let proofSliderTimer = null;
         let settingsActiveTab = 'general';
 
         function navigate(view, id = null) {
@@ -874,58 +897,6 @@
                     el.style.opacity = 1;
                 }, 250);
             }
-        }
-
-        // --- LIVE SALES NOTIFICATION TOAST ---
-        function initLiveSalesToast() {
-            // Disabled background auto-refresh interval to prevent any page jump or refresh feeling
-        }
-
-        function showSalesToast(buyerName, city, itemName) {
-            const container = document.getElementById('sales-toast-container');
-            if(!container) return;
-            const toastId = 'toast-' + Date.now();
-            const html = `
-                <div id="${toastId}" class="pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3.5 shadow-2xl border border-slate-100 flex items-center gap-3 max-w-xs animate-slide-up mb-2">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                        <i class="ph ph-shopping-cart text-lg font-bold"></i>
-                    </div>
-                    <div class="overflow-hidden">
-                        <p class="text-[11px] font-bold text-slate-800 line-clamp-1">${buyerName} dari ${city}</p>
-                        <p class="text-[10px] text-slate-500 line-clamp-1">Baru saja membeli: <span class="text-primary font-semibold" style="color:${state.settings.iconColor}">${itemName}</span></p>
-                    </div>
-                    <button onclick="document.getElementById('${toastId}').remove()" class="text-slate-400 hover:text-slate-600 p-1 flex-shrink-0">
-                        <i class="ph ph-x text-xs"></i>
-                    </button>
-                </div>
-            `;
-            container.insertAdjacentHTML('beforeend', html);
-            setTimeout(() => {
-                const el = document.getElementById(toastId);
-                if(el) el.remove();
-            }, 4500);
-        }
-
-        // --- BANNER SLIDER AUTO TIMER ---
-        function initBannerSlider() {
-            // Disabled automatic banner timer rotation to keep the view completely static and stable
-        }
-
-        function updateBannerDots() {
-            const dots = document.querySelectorAll('.banner-dot');
-            dots.forEach((dot, idx) => {
-                if(idx === currentBannerIndex) {
-                    dot.className = 'banner-dot w-6 h-2 rounded-full bg-primary transition-all';
-                    dot.style.backgroundColor = state.settings.iconColor;
-                } else {
-                    dot.className = 'banner-dot w-2 h-2 rounded-full bg-slate-300 transition-all';
-                }
-            });
-        }
-
-        // --- PAYMENT PROOF SLIDER AUTO TIMER ---
-        function initProofSlider() {
-            // Disabled automatic proof slider timer rotation
         }
 
         // --- RENDER HEADER ---
@@ -2699,7 +2670,7 @@
                  root.innerHTML = `
                     ${renderHeader(true)}
                     <main class="min-h-screen pt-0">
-                        ${renderAnnouncementBar()}
+                        ${renderAnnouncementData ? '' : ''}
                         ${renderEditProductFull(currentProductId)}
                     </main>
                     ${renderFooter()}
@@ -2724,7 +2695,6 @@
             loadState();
             render();
             initAnnouncementSlider();
-            // Live sales, banner timer, and proof slider timers disabled to prevent any auto-refresh behavior
         }
     </script>
 </body>
